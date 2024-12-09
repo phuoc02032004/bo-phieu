@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
-const electionSchema = new mongoose.Schema({
+const electionSchema = new mongoose.Schema(
+  {
     title: {
       type: String,
       required: true,
@@ -11,15 +12,15 @@ const electionSchema = new mongoose.Schema({
       trim: true,
     },
     creatorId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-        required: true,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
     },
     candidates: [
       {
         candidate: {
           type: mongoose.Schema.Types.ObjectId,
-          ref: "User", // Tham chiếu tới User
+          ref: 'User', // Tham chiếu tới User
           required: true,
         },
         votes: {
@@ -31,7 +32,7 @@ const electionSchema = new mongoose.Schema({
     voters: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+        ref: 'User',
       },
     ],
     startTime: {
@@ -42,43 +43,9 @@ const electionSchema = new mongoose.Schema({
       type: Date,
       required: true,
     },
-    blockchainData: [
-      {
-        blockHash: {
-          type: String,
-          required: true,
-        },
-        previousHash: {
-          type: String,
-          required: true,
-        },
-        timestamp: {
-          type: Date,
-          required: true,
-          default: Date.now,
-        },
-        voterId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-          required: true,
-        },
-        candidateId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User", // Tham chiếu tới User
-          required: true,
-        },
-      },
-    ],
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
-    updatedAt: {
-      type: Date,
-      default: Date.now,
-    },
-  });
-  
-  const Election = mongoose.model("Election", electionSchema);
-  module.exports = Election;
-  
+  },
+  { timestamps: true } // Tự động thêm createdAt và updatedAt
+);
+
+const Election = mongoose.model('Election', electionSchema);
+module.exports = Election;
