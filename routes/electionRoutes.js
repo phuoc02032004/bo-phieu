@@ -1,0 +1,11 @@
+const express = require('express');
+const router = express.Router();
+const electionController = require('../controllers/electionController');
+const authMiddleware = require('../middleware/AuthMiddleware'); // Middleware xác thực
+
+router.post('/', authMiddleware, electionController.createElection);
+router.get('/', authMiddleware, electionController.getAllElections);
+router.get('/:id', authMiddleware, electionController.getElectionById);
+router.post('/vote', authMiddleware, electionController.castVote);
+
+module.exports = router;
