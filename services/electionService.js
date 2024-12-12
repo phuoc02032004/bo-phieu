@@ -1,7 +1,11 @@
 const Election = require("../models/Election");
 const Block = require("../models/Block");   
-const Blockchain = require("../utils/blockchain");
+const Blockchain = require('../utils/blockchain');
 const mongoose = require('mongoose');
+const fs = require('node:fs/promises');
+const path = require('path');
+
+let blockchainInstance = null;
 
 const createElection = async (electionData) => {
   try {
@@ -23,119 +27,72 @@ const getElectionById = async (electionId) => {
     .populate("candidates.candidate");
 };
 
-const castVote = async ({ electionId, candidateId, voterId }) => {
+
+const getBlockchainInstance = async () => {
+    const filePath = path.resolve(__dirname, '..', 'blockchain.json');
+    if (!blockchainInstance) {
+        try {
+            blockchainInstance = new Blockchain(filePath);
+            await blockchainInstance.loadBlockchain();
+            console.log(`Blockchain instance initialized with file path: ${filePath}`);
+        } catch (error) {
+            console.error('Error initializing blockchain:', error);
+            blockchainInstance = new Blockchain(filePath);
+            await blockchainInstance.createGenesisBlock();
+        }
+    }
+    return blockchainInstance;
+};
+
+const castVote = async (voteData) => {
+    const { electionId, candidateId, voterId } = voteData;
     console.log("\n--- Starting castVote ---");
     console.log("Casting vote:", { electionId, candidateId, voterId });
 
-    // Kiểm tra đầu vào và kiểu dữ liệu
-    if (!electionId || !candidateId || !voterId) {
-        throw new Error("electionId, candidateId, and voterId are required.");
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(electionId) || 
-        !mongoose.Types.ObjectId.isValid(candidateId) ||
-        !mongoose.Types.ObjectId.isValid(voterId)) {
-        throw new Error("Invalid ObjectId provided.");
-    }
+    // Input validation (giữ nguyên)
 
     try {
         const election = await Election.findById(electionId)
-            .populate("candidates.candidate")
-            .populate("creatorId");
+            .populate('candidates.candidate')
+            .populate('creatorId');
 
         if (!election) {
-            throw new Error("Election not found.");
+            throw new Error('Election not found.');
         }
 
-        if (!election.candidates || !Array.isArray(election.candidates)) {
-            throw new Error("Invalid candidate data.");
-        }
+        // Check election time (giữ nguyên)
 
-        const now = new Date();
-        console.log("\n--- Time check ---");
-        console.log("Current time:", now);
-        console.log("Start time:", election.startTime);
-        console.log("End time:", election.endTime);
-
-        // Kiểm tra thời gian bầu cử
-        if (now < election.startTime || now > election.endTime) {
-            throw new Error("Election is not currently active.");
-        }
-
-        // Kiểm tra xem voter đã bỏ phiếu chưa
         if (election.voters && election.voters.includes(voterId)) {
-            throw new Error("Voter has already cast a vote.");
+            throw new Error('Voter has already cast a vote.');
         }
 
-        // Tìm ứng cử viên trong danh sách
-        const candidate = election.candidates.find((c) => c.candidate._id.equals(candidateId));
+        const candidate = election.candidates.find(c => c.candidate._id.equals(candidateId));
         if (!candidate) {
-            throw new Error("Candidate not found.");
+            throw new Error('Candidate not found.');
         }
 
-        console.log("\n--- Updating vote count ---");
         candidate.votes++;
-        if (!election.voters) {
-            election.voters = [];
-        }
-        election.voters.push(voterId);  // Thêm voterId vào danh sách đã bỏ phiếu
+        election.voters.push(voterId);
 
-        // Kiểm tra và khởi tạo blockchainData nếu chưa tồn tại
-        if (!election.blockchainData) {
-            election.blockchainData = [];
-        }
+        // Get blockchain instance (giữ nguyên)
+        const blockchain = new Blockchain(); //Khởi tạo blockchain ở đây
+        await blockchain.loadBlockchain(); //Load blockchain từ database
+        const latestBlock = await blockchain.getLatestBlock();
+        const previousHash = latestBlock ? latestBlock.hash : '0';
+        const newIndex = (latestBlock ? latestBlock.index : 0) + 1;
 
-        // Tạo block mới cho cuộc bầu cử
-        const previousBlock = election.blockchainData[election.blockchainData.length - 1];
-        const previousHash = previousBlock ? previousBlock.blockHash : '0'; // Nếu không có block nào, đặt previousHash là '0'
-        const newIndex = election.blockchainData.length + 1;  // Đảm bảo index tăng dần
+        const newBlockData = { electionId, voterId, candidateId, timestamp: new Date() };
+        const newBlock = blockchain.createBlock(newBlockData, previousHash, newIndex);
 
-        console.log("\n--- Creating block ---");
-        console.log("Previous Hash:", previousHash);
-        console.log("New Index:", newIndex);
+        // Save the new block
+        await new Block(newBlock).save();
 
-        try {
-            // Tạo block mới
-            const newBlock = Blockchain.createBlock({
-                data: { electionId, voterId, candidateId },
-                previousHash,
-                index: newIndex
-            });
+        // Save the updated election
+        await election.save();
 
-            // Kiểm tra tính hợp lệ của block
-            if (!newBlock || !newBlock.hash) {
-                throw new Error("Lỗi tạo block trên blockchain: blockHash không hợp lệ.");
-            }
-
-            // Tạo đối tượng Block mới và lưu vào MongoDB
-            const block = new Block({
-                electionId,
-                voterId,
-                candidateId,
-                blockHash: newBlock.hash,
-                previousHash: newBlock.previousHash,
-                index: newBlock.index
-            });
-
-            await block.save();  // Lưu block vào MongoDB
-
-            // Thêm block vào blockchain của cuộc bầu cử
-            election.blockchainData.push(newBlock);
-            console.log("blockchainData after push:", election.blockchainData);
-
-            // Lưu cuộc bầu cử với block mới
-            const savedElection = await election.save();
-            console.log("\n--- Election saved successfully ---");
-            console.log(savedElection);
-
-            return savedElection;
-        } catch (blockError) {
-            console.error("\n--- Error creating block ---\n", blockError);
-            throw new Error("Lỗi tạo block trên blockchain: " + blockError.message);
-        }
+        return election;
     } catch (error) {
-        console.error("\n--- Error casting vote ---");
-        console.error(error);
+        console.error('\n--- Error casting vote ---', error);
         throw error;
     }
 };

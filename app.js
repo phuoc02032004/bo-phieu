@@ -6,9 +6,13 @@ const createError = require('http-errors');
 const cors = require('cors');
 const connectDB = require('./config/database'); // Adjust path as needed
 const initRoutes = require('./routes/index'); // Adjust path as needed
+const Blockchain = require('./utils/blockchain');
+
 require('dotenv').config();
 
 const app = express();
+
+global.blockchainInstance = new Blockchain(path.join(__dirname, 'blockchain.json')); 
 
 connectDB.connectDB().catch(err => {
   console.error("Failed to connect to database:", err);

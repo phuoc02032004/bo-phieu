@@ -1,52 +1,67 @@
-const crypto = require("crypto");
-
-class Block {
-  constructor(index, timestamp, data, previousHash, hash) {
-    this.index = index;
-    this.timestamp = timestamp;
-    this.data = data;
-    this.previousHash = previousHash;
-    this.hash = hash;
-  }
-}
+const crypto = require('crypto');
+const Block = require('../models/Block'); // Import your Block model
+const mongoose = require('mongoose');
 
 class Blockchain {
-  constructor() {
-    this.chain = [];
-    this.createGenesisBlock();
-  }
-
-  createGenesisBlock() {
-    const genesisBlock = this.createBlock({ data: "Genesis Block", previousHash: "0" });
-    this.chain.push(genesisBlock);
-  }
-
-  calculateHash(data) {
-    return crypto.createHash("sha256").update(JSON.stringify(data)).digest("hex");
-  }
-
-  createBlock({ data, previousHash }) {
-    const index = this.chain.length;
-    const timestamp = new Date();
-    const blockHash = this.calculateHash({ index, timestamp, data, previousHash });
-    return new Block(index, timestamp, data, previousHash, blockHash);
-  }
-
-  getLatestHash(chain) {
-    if (!chain || chain.length === 0) return "0";
-    return chain[chain.length - 1].hash;
-  }
-
-  isValidChain(chain) {
-    if (!chain || chain.length === 0) return true; 
-    for (let i = 1; i < chain.length; i++) {
-      const currentBlock = chain[i];
-      const previousBlock = chain[i - 1];
-      if (currentBlock.hash !== this.calculateHash(currentBlock)) return false;
-      if (currentBlock.previousHash !== previousBlock.hash) return false;
+    constructor(filePath) {
+        //filePath không cần thiết nữa vì chúng ta lưu vào database
     }
-    return true;
+
+    async createGenesisBlock() {
+        const genesisBlock = this.createBlock({ data: 'Genesis Block', previousHash: '0' }, 0);
+        await new Block(genesisBlock).save();
+        console.log('Genesis block created successfully.');
+    }
+
+    calculateHash(blockData) {
+        const blockString = JSON.stringify(blockData, Object.keys(blockData).sort());
+        return crypto.createHash('sha256').update(blockString).digest('hex');
+    }
+
+    createBlock(blockData, previousHash, index) {
+      const newBlock = {
+          index,
+          timestamp: new Date(),
+          data: blockData,
+          previousHash,
+          hash: this.calculateHash({...blockData, previousHash, index}),
+          electionId: blockData.electionId, // Thêm các trường cần thiết
+          voterId: blockData.voterId,
+          candidateId: blockData.candidateId,
+      };
+      return newBlock;
   }
+
+    async getLatestBlock() {
+        const latestBlock = await Block.findOne({}, {}, { sort: { index: -1 } });
+        return latestBlock;
+    }
+
+    async addBlock(newBlock) {
+        await new Block(newBlock).save();
+        console.log('Block added to blockchain:', newBlock);
+    }
+
+    async loadBlockchain() {
+        try {
+            this.chain = await Block.find({}).sort({ index: 1 });
+            console.log('Blockchain loaded from database.');
+        } catch (error) {
+            console.error('Error loading blockchain:', error);
+            if (error.name === 'CastError'){
+                //Tạo genesis block nếu database bị lỗi
+                console.log('Creating genesis block...');
+                this.createGenesisBlock();
+            } else {
+                throw error;
+            }
+        }
+    }
+
+
+    async saveBlockchain() {
+        //Không cần thiết nữa vì chúng ta đã save từng block
+    }
 }
 
-module.exports = new Blockchain();
+module.exports = Blockchain;
