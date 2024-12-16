@@ -9,31 +9,40 @@ import { UpdateCandidateDto } from './dto/update-candidate.dto';
 import mongoose, { Types } from 'mongoose';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
-@Controller('elections')
+@Controller('api/v1/elections')
 export class ElectionsController {
   constructor(private readonly electionsService: ElectionsService) {}
 
   @Post('/')
-  @UseGuards(JwtAuthGuard)
-  @UsePipes(new ValidationPipe())
-  create(@Body() createElectionDto: CreateElectionDto, @Request() req: any) {
-      const creatorId = req.user?._id;
-      if (!creatorId) {
-          throw new UnauthorizedException('User not authenticated.');
-      }
-      return this.electionsService.create({ ...createElectionDto, creatorId }); 
+@UseGuards(JwtAuthGuard)
+@UsePipes(new ValidationPipe())
+async create(@Body() createElectionDto: CreateElectionDto, @Request() req: any) {
+  try {
+    const creatorId = req.user?._id;
+    if (!creatorId) {
+      throw new UnauthorizedException('User not authenticated.');
+    }
+    const newElection = await this.electionsService.create({ ...createElectionDto, creatorId });
+    return newElection;
+  } catch (error) {
+    if (error instanceof BadRequestException) { // Hoặc các custom exception khác của bạn
+      throw error;
+    } else {
+      console.error("Error creating election:", error);
+      throw new InternalServerErrorException("Failed to create election"); // Generic error for unexpected issues
+    }
   }
-
+}
   @Get()
   findAll() {
     return this.electionsService.findAll();
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.electionsService.findOne(id);
+  async findOne(@Param('id') id: string) {
+    const election = await this.electionsService.findOne(id);
+    return election; 
   }
-
   @Put(':id')
   @UsePipes(new ValidationPipe())
   update(@Param('id') id: string, @Body() updateElectionDto: UpdateElectionDto) {
@@ -142,5 +151,6 @@ export class ElectionsController {
       }
     }
   }
+  
 
 }

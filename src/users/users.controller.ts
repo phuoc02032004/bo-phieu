@@ -5,7 +5,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import mongoose from 'mongoose';
 
 
-@Controller('users')
+@Controller('api/v1/users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 

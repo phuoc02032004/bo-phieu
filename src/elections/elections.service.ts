@@ -8,8 +8,7 @@ import { BlockchainService } from '../block/blockchain.service';
 import { UsersService } from '../users/users.service';
 import { CastVoteDto } from './dto/cast-vote.dto';
 import { UpdateCandidateDto } from './dto/update-candidate.dto';
-import { UserDocument } from 'src/users/users.schema';
-import mongoose from 'mongoose';
+import { User, UserDocument } from '../users/users.schema'; import mongoose from 'mongoose';
 
 @Injectable()
 export class ElectionsService {
@@ -17,11 +16,27 @@ export class ElectionsService {
     @InjectModel(Election.name) private electionModel: Model<ElectionDocument>,
     private readonly blockchainService: BlockchainService,
     private readonly usersService: UsersService,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
 
   async create(createElectionDto: CreateElectionDto): Promise<ElectionDocument> {
-    const newElection = await this.electionModel.create(createElectionDto);
-    return newElection;
+    try {
+      const newElection = await this.electionModel.create(createElectionDto);
+
+      // Lấy creatorId từ DTO
+      const creatorId = createElectionDto.creatorId;
+
+      // Tìm user và update createdElections
+      await this.userModel.findByIdAndUpdate(creatorId, {
+        $push: { createdElections: newElection._id },
+      });
+
+      return newElection;
+    } catch (error) {
+      // Xử lý lỗi như đã đề cập ở câu trả lời trước
+      console.error("Error creating election:", error);
+      throw error; 
+    }
   }
 
   async findAll(): Promise<ElectionDocument[]> {

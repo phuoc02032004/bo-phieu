@@ -40,4 +40,8 @@ export class CreateElectionDto {
   @IsDate()
   @Type(() => Date) 
   endTime: Date;
+
+  @IsOptional() 
+  @IsDate()
+  completionTime?: Date; 
 }

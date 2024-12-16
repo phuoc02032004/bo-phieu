@@ -8,17 +8,20 @@ import { UsersModule } from '../users/users.module';
 import { BlockchainService } from '../block/blockchain.service';
 import { UtilsModule } from 'src/utils/utils.module';
 import { AuthModule } from 'src/auth/auth.module';
+import { User, UserSchema } from '../users/users.schema'; 
+
 
 @Module({
     imports: [
       MongooseModule.forFeature([{ name: Election.name, schema: ElectionSchema }]),
       MongooseModule.forFeature([{ name: Block.name, schema: BlockSchema }]),
-      UsersModule,
+      MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),  
+      UsersModule, 
       UtilsModule,
-      AuthModule
+      AuthModule,
     ],
     controllers: [ElectionsController],
-    providers: [ElectionsService, BlockchainService, AuthModule],
+    providers: [ElectionsService, BlockchainService], 
     exports: [ElectionsService],
   })
   export class ElectionsModule {}
